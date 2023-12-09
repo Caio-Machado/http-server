@@ -29,13 +29,41 @@ fn try_write_client(client: &mut TcpStream, response: String) -> Option<usize> {
 }
 
 fn handle_client(client: &mut TcpStream) {
+    let response_200: String = String::from("HTTP/1.1 200 OK\r\n\r\n");
+    let response_404: String = String::from("HTTP/1.1 404 Not Found\r\n\r\n");
     match try_read_client_to_string(client) {
-        Some(_request_string) => {
-            let response: String = String::from("HTTP/1.1 200 OK\r\n\r\nteste");
-            match try_write_client(client, response) {
-                Some(size) => println!("{} bytes have been written successfully!", size),
-                None => (),
+        Some(request_string) => {
+            // println!("{:?}", request_string);
+            let request_path: Result<String, ()> = match request_string.split_once("\r\n") {
+                Some((start_line, _)) => {
+                    let splited_start_line: Vec<&str> = start_line.split_whitespace().collect();
+                    match splited_start_line.get(1) {
+                        Some(path) => Ok(path.to_string()),
+                        None => Err(()),
+                    }
+                },
+                None => Err(()),
             };
+
+            match request_path {
+                Ok(path) => {
+                    match path.as_str() {
+                        "/" => {
+                            match try_write_client(client, response_200) {
+                                Some(size) => println!("{} bytes have been written successfully!", size),
+                                None => (),
+                            };
+                        },
+                        _ => {
+                            match try_write_client(client, response_404) {
+                                Some(size) => println!("{} bytes have been written successfully!", size),
+                                None => (),
+                            };
+                        }
+                    }
+                },
+                Err(_) => (),
+            }
         },
         None => (),
     }
@@ -48,7 +76,6 @@ fn main() {
             for connection in listener.incoming() {
                 match connection {
                     Ok(mut client_to_handle) => {
-                        println!("{:?}", &client_to_handle.peer_addr().unwrap());
                         handle_client(&mut client_to_handle);
                     }
                     Err(e) => {

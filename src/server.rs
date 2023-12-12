@@ -2,6 +2,7 @@ use std::io::prelude::{Read, Write};
 use std::net::{TcpStream, TcpListener};
 
 use self::request::Request;
+use self::response::Response;
 
 mod request;
 mod header;
@@ -35,8 +36,6 @@ fn try_write_client(client: &mut TcpStream, response: String) -> Option<usize> {
 }
 
 fn handle_client(client: &mut TcpStream) {
-    let response_200: String = String::from("HTTP/1.1 200 OK\r\n\r\n");
-    let response_404: String = String::from("HTTP/1.1 404 Not Found\r\n\r\n");
     match try_read_client_to_string(client) {
         Some(request_string) => {
             let request: Option<Request> = match Request::extract_request_fields(request_string) {
@@ -46,23 +45,29 @@ fn handle_client(client: &mut TcpStream) {
                     None
                 },
             };
-
             match request {
                 Some(r) => {
-                    println!("{:?}", &r);
-                    match r.start_line.request_target.path.as_str() {
+                    let response: Response = match r.start_line.request_target.path.as_str() {
                         "/" => {
-                            match try_write_client(client, response_200) {
-                                Some(size) => println!("{} bytes have been written successfully!", size),
-                                None => (),
-                            };
+                            match Response::try_build_response_fields(200, None, None) {
+                                Ok((status_line, headers, body)) => {
+                                    Response::build_response(status_line, headers, body)
+                                },
+                                Err(_) => return (),
+                            }
                         },
                         _ => {
-                            match try_write_client(client, response_404) {
-                                Some(size) => println!("{} bytes have been written successfully!", size),
-                                None => (),
-                            };
-                        }
+                            match Response::try_build_response_fields(404, None, None) {
+                                Ok((status_line, headers, body)) => {
+                                    Response::build_response(status_line, headers, body)
+                                },
+                                Err(_) => return (),
+                            }
+                        },
+                    };
+                    match try_write_client(client, response.build_response_as_string()) {
+                        Some(size) => println!("{size} bytes have been written successfully"),
+                        None => (),
                     }
                 },
                 None => (),

@@ -26,7 +26,7 @@ impl Request {
             Err(e) => return Err(e),
         };
         let header: Vec<Header> =
-            match Header::try_build_headers(splited_request.get(1..splited_request.len() - 1)) {
+            match Header::try_build_headers_from_slice(splited_request.get(1..splited_request.len() - 1)) {
                 Ok(headers) => headers,
                 Err(_) => return Err(RequestError::InvalidHeader),
             };

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::prelude::{Read, Write};
 use std::net::{TcpStream, TcpListener};
 
@@ -41,13 +42,25 @@ fn handle_client(client: &mut TcpStream) {
             let request: Option<Request> = match Request::extract_request_fields(request_string) {
                 Ok((start_line, headers, body)) => Some(Request::new(start_line, headers, body)),
                 Err(_) => {
-                    println!("Deu erro na hora de montar a request");
                     None
                 },
             };
             match request {
                 Some(r) => {
                     let response: Response = match r.start_line.request_target.path.as_str() {
+                        "echo" => {
+                            let body = r.start_line.request_target.random_string;
+                            let headers: HashMap<&str, String> = HashMap::from([
+                                ("Content-Type", String::from("text/plain")),
+                                ("Content-Length", format!("{}", body.as_ref().unwrap().len()))
+                                ]);
+                            match Response::try_build_response_fields(200, Some(headers), body.as_ref()) {
+                                Ok((status_line, headers, body)) => {
+                                    Response::build_response(status_line, headers, body)
+                                },
+                                Err(_) => return (),
+                            }
+                        },
                         "/" => {
                             match Response::try_build_response_fields(200, None, None) {
                                 Ok((status_line, headers, body)) => {

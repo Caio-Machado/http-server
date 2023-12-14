@@ -1,5 +1,6 @@
-use crate::server::header::Header;
+use std::collections::HashMap;
 
+use crate::server::header::Header;
 use super::header::HeaderError;
 
 const HTTP_SERVER: &str = "HTTP/1.1";
@@ -26,13 +27,13 @@ impl Response {
 
     pub fn try_build_response_fields(
         status_code: u16,
-        headers_strings: Option<&[&str]>,
-        body_string: Option<&str>,
+        headers_hash: Option<HashMap<&str, String>>,
+        body_string: Option<&String>,
     ) -> Result<(StatusLine, Option<Vec<Header>>, Option<String>), HeaderError> {
         let status_line: StatusLine = StatusLine::build(status_code);
-        let headers: Option<Vec<Header>> = match Header::try_build_headers(headers_strings) {
-            Ok(h) => Some(h),
-            Err(e) => return Err(e),
+        let headers: Option<Vec<Header>> = match headers_hash {
+            Some(hash) => Some(Header::try_build_headers_from_hashmap(hash)),
+            None => None,
         };
         let body: Option<String> = match body_string {
             Some(b) => Some(b.to_string()),

@@ -176,5 +176,4 @@ impl HttpVersion {
 pub enum RequestError {
     InvalidStarLine,
     InvalidHeader,
-    InvalidBody,
 }

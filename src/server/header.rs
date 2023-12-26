@@ -22,12 +22,13 @@ impl Header {
         }
     }
 
-    pub fn try_build_headers_from_hashmap(
-        possible_headers: HashMap<&str, String>,
-    ) -> Vec<Header> {
+    pub fn try_build_headers_from_hashmap(possible_headers: HashMap<&str, String>) -> Vec<Header> {
         possible_headers
             .iter()
-            .map(|(section, content)| Header{section: section.to_string(), content: content.to_string()})
+            .map(|(section, content)| Header {
+                section: section.to_string(),
+                content: content.to_string(),
+            })
             .collect::<Vec<Header>>()
     }
 

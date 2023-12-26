@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 use std::io::prelude::{Read, Write};
-use std::net::{TcpStream, TcpListener};
+use std::net::{TcpListener, TcpStream};
+use std::thread;
 
 use self::request::Request;
 use self::response::Response;
 
-mod request;
 mod header;
+mod request;
 mod response;
 
 fn try_read_client_to_string(client: &mut TcpStream) -> Option<String> {
@@ -21,7 +22,7 @@ fn try_read_client_to_string(client: &mut TcpStream) -> Option<String> {
             println!("An error occurred when trying to read peer: {}", peer_addr);
             println!("Error result: {}", error);
             None
-        },
+        }
     }
 }
 
@@ -32,7 +33,7 @@ fn try_write_client(client: &mut TcpStream, response: String) -> Option<usize> {
             println!("An error occurred when trying to write a response!");
             println!("Error result: {}", error);
             None
-        },
+        }
     }
 }
 
@@ -41,9 +42,7 @@ fn handle_client(client: &mut TcpStream) {
         Some(request_string) => {
             let request: Option<Request> = match Request::extract_request_fields(request_string) {
                 Ok((start_line, headers, body)) => Some(Request::new(start_line, headers, body)),
-                Err(_) => {
-                    None
-                },
+                Err(_) => None,
             };
             match request {
                 Some(r) => {
@@ -52,61 +51,63 @@ fn handle_client(client: &mut TcpStream) {
                             let body = r.start_line.request_target.random_string;
                             let headers: HashMap<&str, String> = HashMap::from([
                                 ("Content-Type", String::from("text/plain")),
-                                ("Content-Length", format!("{}", body.as_ref().unwrap().len()))
-                                ]);
-                            match Response::try_build_response_fields(200, Some(headers), body.as_ref()) {
+                                (
+                                    "Content-Length",
+                                    format!("{}", body.as_ref().unwrap().len()),
+                                ),
+                            ]);
+                            match Response::try_build_response_fields(
+                                200,
+                                Some(headers),
+                                body.as_ref(),
+                            ) {
                                 Ok((status_line, headers, body)) => {
                                     Response::build_response(status_line, headers, body)
-                                },
+                                }
                                 Err(_) => return (),
                             }
+                        }
+                        "/" => match Response::try_build_response_fields(200, None, None) {
+                            Ok((status_line, headers, body)) => {
+                                Response::build_response(status_line, headers, body)
+                            }
+                            Err(_) => return (),
                         },
-                        "/" => {
-                            match Response::try_build_response_fields(200, None, None) {
-                                Ok((status_line, headers, body)) => {
-                                    Response::build_response(status_line, headers, body)
-                                },
-                                Err(_) => return (),
+                        _ => match Response::try_build_response_fields(404, None, None) {
+                            Ok((status_line, headers, body)) => {
+                                Response::build_response(status_line, headers, body)
                             }
-                        },
-                        _ => {
-                            match Response::try_build_response_fields(404, None, None) {
-                                Ok((status_line, headers, body)) => {
-                                    Response::build_response(status_line, headers, body)
-                                },
-                                Err(_) => return (),
-                            }
+                            Err(_) => return (),
                         },
                     };
                     match try_write_client(client, response.build_response_as_string()) {
                         Some(size) => println!("{size} bytes have been written successfully"),
                         None => (),
                     }
-                },
+                }
                 None => (),
             }
-        },
+        }
         None => (),
     }
 }
 
 pub fn run(addres: &str) {
     match TcpListener::bind(addres) {
-        Ok(listener) => {
-            for connection in listener.incoming() {
-                match connection {
-                    Ok(mut client_to_handle) => {
-                        handle_client(&mut client_to_handle);
-                    }
-                    Err(e) => {
-                        println!("Connection failure in {e:?}");
-                    }
+        Ok(listener) => loop {
+            match listener.accept() {
+                Ok((mut client_to_handle, _)) => {
+                    let handler = thread::spawn(move || handle_client(&mut client_to_handle));
+                    handler.join().unwrap();
+                }
+                Err(e) => {
+                    println!("Connection failure in {e:?}");
                 }
             }
         },
         Err(error) => {
             println!("An error occurred when trying to bind addres: {}", addres);
             println!("Error: {}", error);
-        },
+        }
     }
 }
